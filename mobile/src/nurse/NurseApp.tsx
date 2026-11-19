@@ -8,6 +8,7 @@ import { NavProvider, useNav } from '../nav';
 import { rawApi, useResource, useSession, useSocketEvent } from '../session';
 import { Avatar, Badge, Button, Card, Field, Loading, NotificationList, Pulse, Row, Screen, Segmented, Stars, StatusBadge, Tabs, ToastBanner, useAccent } from '../ui';
 import { ChatSheet, IncidentSheet, call, fmtDate, getPosition, openMaps } from '../common';
+import { NurseDocuments, missingDocs } from './Documents';
 
 type Offer = CareRequest & { distanceKm?: number; nurseShare: number };
 interface Earnings {
@@ -97,8 +98,9 @@ function NurseLogin() {
 function Availability() {
   const nav = useNav();
   const a = useAccent();
-  const { user: u, setUser, api } = useSession();
+  const { user: u, setUser, api, notifications } = useSession();
   const user = u as NurseProfile | null;
+  const coordination = notifications.filter((n) => n.event === 'admin_message').slice(0, 2);
   const offers = useResource<Offer[]>('/nurse/offers', [user?.available]);
   const mine = useResource<CareRequest[]>('/requests/mine');
   const earnings = useResource<Earnings>('/nurse/earnings');
@@ -130,6 +132,16 @@ function Availability() {
           {user.verification === 'pending' ? '⏳ Votre dossier est en cours de vérification. Vous serez notifié dès sa validation.' : '✕ Candidature refusée. Contactez la coordination Kulawa.'}
         </Text>
       )}
+      {missingDocs(user).length > 0 && (
+        <Text style={s.warn}>📄 {missingDocs(user).length} document(s) à fournir — onglet Profil : {missingDocs(user).map((d) => d.label).join(', ')}</Text>
+      )}
+      {coordination.map((m) => (
+        <Card key={m.id} style={{ borderLeftWidth: 4, borderLeftColor: colors.navy, backgroundColor: m.read ? '#fff' : '#eef3fa' }}>
+          <Text style={s.small}>Message de la coordination · {fmtDate(m.createdAt)}</Text>
+          <Text style={s.h3}>{m.title.replace(/^📢\s*/, '')}</Text>
+          <Text style={s.text}>{m.body}</Text>
+        </Card>
+      ))}
       <Card style={[s.between, user.available ? { backgroundColor: a.soft, borderColor: a.main } : {}]}>
         <View style={{ flex: 1 }}>
           <Text style={s.h3}>{user.available ? 'Vous êtes disponible' : 'Vous êtes hors ligne'}</Text>
@@ -473,20 +485,14 @@ function EarningsScreen() {
 }
 
 function ProfileDocs() {
-  const { user: u, logout, unread, markRead } = useSession();
+  const { user: u, setUser, api, logout, unread, markRead } = useSession();
+  useSocketEvent('notification', () => api<User>('/me').then(setUser).catch(() => {}));
   const user = u as NurseProfile | null;
   const [tab, setTab] = useState<'profil' | 'notifs'>(unread ? 'notifs' : 'profil');
   useEffect(() => {
     if (tab === 'notifs' && unread) markRead();
   }, [tab, unread, markRead]);
   if (!user) return <Loading />;
-  const docColors = { missing: ['#fbe9e8', colors.red], submitted: ['#fff4e0', '#9a5a00'], validated: ['#eaf6e4', '#3b7f22'] } as const;
-  const docLabel = { missing: 'Manquant', submitted: 'En vérification', validated: 'Validé' };
-  const docs = [
-    ['Contrat de partenariat', user.documents?.contract ?? 'missing'],
-    ['Attestation d’assurance RC Pro', user.documents?.insurance ?? 'missing'],
-    ['Diplôme d’État & Ordre', user.documents?.diploma ?? 'missing'],
-  ] as const;
   return (
     <Screen title="Profil & documents" back={false}>
       <Segmented
@@ -520,13 +526,7 @@ function ProfileDocs() {
             <Row label="Ordre national" value={user.ordreNumber || '—'} />
             <Row label="Note moyenne" value={`★ ${user.rating?.toFixed(1)} (${user.ratingCount})`} />
           </Card>
-          <Text style={s.h3}>Documents</Text>
-          {docs.map(([label, st]) => (
-            <Card key={label} style={s.between}>
-              <Text style={[s.text, { flex: 1 }]}>📄 {label}</Text>
-              <Badge label={docLabel[st]} bg={docColors[st][0]} fg={docColors[st][1]} />
-            </Card>
-          ))}
+          <NurseDocuments />
           <Pressable onPress={logout} style={{ padding: 12, alignItems: 'center' }}>
             <Text style={{ color: colors.red, fontWeight: '600', textDecorationLine: 'underline' }}>Se déconnecter</Text>
           </Pressable>

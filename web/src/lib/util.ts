@@ -51,3 +51,27 @@ export function downloadWithToken(path: string, token: string, filename: string)
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
 }
+
+/** Lit un fichier choisi par l'utilisateur et renvoie son contenu en base64 (sans préfixe data:). */
+export function readFileBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => reject(new Error('Lecture du fichier impossible.'));
+    r.readAsDataURL(file);
+  });
+}
+
+/** Ouvre un fichier protégé (pièce justificative) dans un nouvel onglet. */
+export async function openWithToken(path: string, token: string) {
+  const win = window.open('', '_blank'); // ouvert immédiatement pour éviter le bloqueur de pop-up
+  const res = await fetch(`/api${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    win?.close();
+    throw new Error('Document introuvable.');
+  }
+  const url = URL.createObjectURL(await res.blob());
+  if (win) win.location.href = url;
+  else window.location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

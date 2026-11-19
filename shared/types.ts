@@ -22,10 +22,51 @@ export interface NurseProfile extends User {
   lng?: number;
   rating: number;
   ratingCount: number;
-  documents: { contract: DocStatus; insurance: DocStatus; diploma: DocStatus };
+  documents: Partial<Record<DocKey, NurseDocument>>;
 }
 
-export type DocStatus = 'missing' | 'submitted' | 'validated';
+export type DocStatus = 'missing' | 'submitted' | 'validated' | 'rejected';
+export type DocKey = 'diploma' | 'ordre' | 'insurance' | 'contract' | 'identity';
+
+export interface NurseDocument {
+  status: DocStatus;
+  fileName?: string;
+  mime?: string;
+  size?: number;
+  uploadedAt?: string;
+  reviewNote?: string; // motif de refus / commentaire de la coordination
+  reviewedAt?: string;
+}
+
+/** Pièces demandées à chaque infirmier partenaire. */
+export const DOC_LIST: { key: DocKey; label: string; hint: string }[] = [
+  { key: 'diploma', label: 'Diplôme d\u2019État d\u2019infirmier', hint: 'Copie lisible du diplôme' },
+  { key: 'ordre', label: 'Attestation d\u2019inscription à l\u2019Ordre', hint: 'Attestation de l\u2019année en cours' },
+  { key: 'insurance', label: 'Attestation d\u2019assurance RC Pro', hint: 'Responsabilité civile professionnelle en cours de validité' },
+  { key: 'contract', label: 'Contrat de partenariat signé', hint: 'Contrat Kulawa signé et paraphé' },
+  { key: 'identity', label: 'Pièce d\u2019identité', hint: 'CNI ou passeport en cours de validité' },
+];
+
+export const DOC_STATUS_LABELS: Record<DocStatus, string> = {
+  missing: 'À fournir',
+  submitted: 'En vérification',
+  validated: 'Validé',
+  rejected: 'Refusé — à renvoyer',
+};
+
+export const docOf = (n: Pick<NurseProfile, 'documents'>, key: DocKey): NurseDocument => n.documents?.[key] ?? { status: 'missing' };
+
+/** Message envoyé par la coordination à un ou plusieurs infirmiers. */
+export interface AdminBroadcast {
+  id: string;
+  title: string;
+  body: string;
+  target: 'all' | 'selected';
+  recipientIds: string[];
+  recipientNames: string[];
+  sms: boolean;
+  createdAt: string;
+}
 
 export interface Service {
   id: string;
@@ -149,7 +190,10 @@ export type NotificationEvent =
   | 'rating_sent'
   | 'nurse_validated'
   | 'incident_reported'
-  | 'message';
+  | 'message'
+  | 'admin_message'
+  | 'document_submitted'
+  | 'document_reviewed';
 
 export interface Settings {
   commissionRate: number; // ex. 0.15

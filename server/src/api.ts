@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import bcrypt from 'bcryptjs';
-import type { CareRequest, Incident, PaymentMethod, RequestStatus, Service } from '../../shared/types.js';
-import { ACTIVE_STATUSES, PAYMENT_LABELS, formatFCFA } from '../../shared/types.js';
+import type { AdminBroadcast, CareRequest, DocKey, Incident, PaymentMethod, RequestStatus, Service } from '../../shared/types.js';
+import { ACTIVE_STATUSES, DOC_LIST, PAYMENT_LABELS, formatFCFA } from '../../shared/types.js';
 import {
   db,
   distanceKm,
@@ -14,6 +16,7 @@ import {
   publicUser,
   reset,
   save,
+  UPLOAD_DIR,
   type StoredNurse,
 } from './db.js';
 import { checkOtp, issueOtp, normalizePhone, requireAuth, signToken } from './auth.js';
@@ -141,7 +144,7 @@ api.post('/auth/nurse/register', (req, res) => {
     available: false,
     rating: 0,
     ratingCount: 0,
-    documents: { contract: 'submitted', insurance: 'missing', diploma: 'submitted' },
+    documents: {},
   };
   db.users.push(nurse);
   save();
@@ -496,6 +499,54 @@ api.get('/nurse/earnings', requireAuth('nurse'), (req, res) => {
   });
 });
 
+// --- Pièces justificatives -------------------------------------------------------
+const DOC_KEYS = DOC_LIST.map((d) => d.key);
+const MIME_EXT: Record<string, string> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic' };
+const MAX_DOC_BYTES = 5 * 1024 * 1024;
+const docLabel = (k: DocKey) => DOC_LIST.find((d) => d.key === k)?.label ?? k;
+
+api.post('/nurse/documents/:key', requireAuth('nurse'), (req, res) => {
+  const nurse = findNurse(req.auth!.sub)!;
+  const key = req.params.key as DocKey;
+  if (!DOC_KEYS.includes(key)) return bad(res, 'Type de document inconnu.');
+  const current = nurse.documents?.[key];
+  if (current?.status === 'validated') return bad(res, 'Ce document est déjà validé.');
+  const mime = String(req.body?.mime ?? '').toLowerCase();
+  const ext = MIME_EXT[mime];
+  if (!ext) return bad(res, 'Format accepté : PDF, JPEG, PNG ou WebP.');
+  const raw = String(req.body?.data ?? '').replace(/^data:[^,]*,/, '');
+  const buf = Buffer.from(raw, 'base64');
+  if (!buf.length) return bad(res, 'Fichier vide.');
+  if (buf.length > MAX_DOC_BYTES) return bad(res, 'Fichier trop volumineux (5 Mo maximum).');
+
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  const old = nurse.docFiles?.[key];
+  if (old) fs.rmSync(path.join(UPLOAD_DIR, old), { force: true });
+  const fileName = `${nurse.id}-${key}-${Date.now()}.${ext}`;
+  fs.writeFileSync(path.join(UPLOAD_DIR, fileName), buf);
+  nurse.docFiles = { ...nurse.docFiles, [key]: fileName };
+  nurse.documents = {
+    ...nurse.documents,
+    [key]: { status: 'submitted', fileName: str(req.body?.name, 120) || `${key}.${ext}`, mime, size: buf.length, uploadedAt: now() },
+  };
+  save();
+  notify('admin', 'document_submitted', 'Nouveau document à vérifier', `${nurse.name} a envoyé : ${docLabel(key)}.`, ['realtime']);
+  res.json(publicUser(nurse));
+});
+
+function sendDoc(res: Response, nurse: StoredNurse | undefined, key: string) {
+  const file = nurse?.docFiles?.[key as DocKey];
+  const meta = nurse?.documents?.[key as DocKey];
+  if (!nurse || !file || !meta) return bad(res, 'Document introuvable.', 404);
+  const full = path.join(UPLOAD_DIR, file);
+  if (!fs.existsSync(full)) return bad(res, 'Fichier introuvable.', 404);
+  res.setHeader('Content-Type', meta.mime ?? 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(meta.fileName ?? file)}"`);
+  res.sendFile(full);
+}
+
+api.get('/nurse/documents/:key', requireAuth('nurse'), (req, res) => sendDoc(res, findNurse(req.auth!.sub), String(req.params.key)));
+
 // --- Back-office --------------------------------------------------------------
 const admin = Router();
 admin.use(requireAuth('admin'));
@@ -628,8 +679,10 @@ admin.post('/nurses/:id/verify', (req, res) => {
   if (!nurse) return bad(res, 'Infirmier introuvable.', 404);
   const decision = req.body?.decision === 'reject' ? 'rejected' : 'verified';
   nurse.verification = decision;
-  if (decision === 'verified') nurse.documents = { contract: 'validated', insurance: 'validated', diploma: 'validated' };
-  else nurse.available = false;
+  if (decision === 'verified') {
+    // Valide les pièces encore en attente de vérification.
+    for (const d of Object.values(nurse.documents ?? {})) if (d?.status === 'submitted') Object.assign(d, { status: 'validated', reviewedAt: now() });
+  } else nurse.available = false;
   save();
   notify(
     nurse.id,
@@ -641,6 +694,69 @@ admin.post('/nurses/:id/verify', (req, res) => {
     ['push', 'sms'],
   );
   res.json(publicUser(nurse));
+});
+
+admin.get('/nurses/:id/documents/:key', (req, res) => sendDoc(res, findNurse(req.params.id), String(req.params.key)));
+
+admin.post('/nurses/:id/documents/:key/review', (req, res) => {
+  const nurse = findNurse(req.params.id);
+  const key = req.params.key as DocKey;
+  const doc = nurse?.documents?.[key];
+  if (!nurse || !doc || doc.status === 'missing') return bad(res, 'Document introuvable.', 404);
+  const validate = req.body?.decision === 'validate';
+  const note = str(req.body?.note, 500);
+  if (!validate && !note) return bad(res, 'Indiquez le motif du refus pour l\u2019infirmier.');
+  Object.assign(doc, { status: validate ? 'validated' : 'rejected', reviewNote: note || undefined, reviewedAt: now() });
+  save();
+  notify(
+    nurse.id,
+    'document_reviewed',
+    validate ? `Document validé : ${docLabel(key)}` : `Document à renvoyer : ${docLabel(key)}`,
+    validate ? note || 'Merci, votre document a été validé par la coordination.' : `Motif : ${note}`,
+    validate ? ['push'] : ['push', 'sms'],
+  );
+  res.json(publicUser(nurse));
+});
+
+/** Demande (ou redemande) une pièce à un infirmier. */
+admin.post('/nurses/:id/documents/:key/request', (req, res) => {
+  const nurse = findNurse(req.params.id);
+  const key = req.params.key as DocKey;
+  if (!nurse || !DOC_KEYS.includes(key)) return bad(res, 'Infirmier ou document introuvable.', 404);
+  const note = str(req.body?.note, 500);
+  const doc = nurse.documents?.[key];
+  if (doc?.status === 'validated') Object.assign(doc, { status: 'rejected', reviewNote: note || 'Nouvelle version demandée', reviewedAt: now() });
+  save();
+  notify(nurse.id, 'document_reviewed', `Document demandé : ${docLabel(key)}`, note || 'Merci d\u2019ajouter ce document depuis Profil & documents.', ['push', 'sms']);
+  res.json(publicUser(nurse));
+});
+
+// Messages de la coordination vers un, plusieurs ou tous les infirmiers
+admin.get('/broadcasts', (_req, res) => res.json(db.broadcasts));
+
+admin.post('/broadcasts', (req, res) => {
+  const title = str(req.body?.title, 120);
+  const body = str(req.body?.body, 1000);
+  if (!title || !body) return bad(res, 'Titre et message requis.');
+  const all = req.body?.target === 'all';
+  const ids: string[] = Array.isArray(req.body?.nurseIds) ? req.body.nurseIds : [];
+  const recipients = nurses().filter((n) => (all ? n.verification !== 'rejected' : ids.includes(n.id)));
+  if (!recipients.length) return bad(res, 'Choisissez au moins un infirmier.');
+  const sms = Boolean(req.body?.sms);
+  const b: AdminBroadcast = {
+    id: id(),
+    title,
+    body,
+    target: all ? 'all' : 'selected',
+    recipientIds: recipients.map((n) => n.id),
+    recipientNames: recipients.map((n) => n.name),
+    sms,
+    createdAt: now(),
+  };
+  db.broadcasts.unshift(b);
+  for (const n of recipients) notify(n.id, 'admin_message', `📢 ${title}`, body, sms ? ['push', 'sms'] : ['push']);
+  save();
+  res.status(201).json(b);
 });
 
 admin.get('/patients', (_req, res) =>

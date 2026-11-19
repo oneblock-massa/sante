@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
-import type { AppNotification, CareRequest, Incident, NurseProfile, PaymentMethod, Service, Settings, User } from '../../../shared/types';
-import { PAYMENT_LABELS, STATUS_LABELS, formatFCFA } from '../../../shared/types';
+import type { AdminBroadcast, AppNotification, CareRequest, DocKey, Incident, NurseProfile, PaymentMethod, Service, Settings, User } from '../../../shared/types';
+import { DOC_LIST, DOC_STATUS_LABELS, PAYMENT_LABELS, STATUS_LABELS, docOf, formatFCFA } from '../../../shared/types';
 import { SessionProvider, apiFetch, useResource, useSession, useSocketEvent } from '../lib/session';
 import { AsyncButton, Avatar, ErrorText, Spinner, Stars, StatusBadge, Toasts } from '../components/ui';
 import { MapView, type MapMarker } from '../components/MapView';
-import { downloadWithToken, fmtDate, timeAgo } from '../lib/util';
+import { downloadWithToken, fmtDate, openWithToken, timeAgo } from '../lib/util';
 
 // Compteur incrémenté à chaque événement temps réel : les pages s'en servent pour se rafraîchir.
 const TickContext = createContext(0);
@@ -74,6 +74,9 @@ function AdminLayout() {
   useSocketEvent('request:update', bump);
   useSocketEvent('notification', bump);
   const alerts = notifications.filter((n) => !n.read && n.channels.includes('alert')).length;
+  // Nombre de pièces en attente de vérification (pastille du menu Infirmiers)
+  const nurseList = useResource<NurseProfile[]>('/admin/nurses', [tick]);
+  const docAlerts = (nurseList.data ?? []).reduce((sum, n) => sum + DOC_LIST.filter((d) => docOf(n, d.key).status === 'submitted').length, 0);
 
   const links = [
     ['', '📊', 'Tableau de bord'],
@@ -82,6 +85,7 @@ function AdminLayout() {
     ['transactions', '💳', 'Transactions'],
     ['qualite', '⚠️', 'Incidents & qualité'],
     ['infirmiers', '🩺', 'Infirmiers'],
+    ['messages', '✉️', 'Messages infirmiers'],
     ['patients', '👥', 'Patients'],
     ['notifications', '🔔', 'Notifications'],
     ['parametres', '⚙️', 'Tarifs & paramètres'],
@@ -105,6 +109,7 @@ function AdminLayout() {
                 <span>{ic}</span>
                 {label}
                 {to === 'qualite' && alerts > 0 && <i className="dot">{alerts}</i>}
+                {to === 'infirmiers' && docAlerts > 0 && <i className="dot">{docAlerts}</i>}
               </NavLink>
             ))}
           </nav>
@@ -127,6 +132,8 @@ function AdminLayout() {
             <Route path="transactions" element={<Transactions />} />
             <Route path="qualite" element={<Quality />} />
             <Route path="infirmiers" element={<Nurses />} />
+            <Route path="infirmiers/:id" element={<NurseDetail />} />
+            <Route path="messages" element={<Messages />} />
             <Route path="patients" element={<Patients />} />
             <Route path="notifications" element={<NotificationsLog />} />
             <Route path="parametres" element={<SettingsPage />} />
@@ -759,6 +766,7 @@ function IncidentDialog({ inc, onClose, onSaved }: { inc: Incident; onClose: () 
 // Fiches infirmiers ------------------------------------------------------------------------------
 function Nurses() {
   const tick = useTick();
+  const nav = useNavigate();
   const { api } = useSession();
   const { data, reload } = useResource<(NurseProfile & { busy: boolean; interventions: number; earnings: number })[]>('/admin/nurses', [tick]);
   const sorted = [...(data ?? [])].sort((a, b) => (a.verification === 'pending' ? -1 : 0) - (b.verification === 'pending' ? -1 : 0));
@@ -773,6 +781,7 @@ function Nurses() {
                 <th>Infirmier</th>
                 <th>Diplôme / Ordre</th>
                 <th>Vérification</th>
+                <th>Documents</th>
                 <th>État</th>
                 <th>Note</th>
                 <th>Soins</th>
@@ -801,11 +810,17 @@ function Nurses() {
                   <td>
                     <span className={`badge ver-${n.verification}`}>{n.verification === 'verified' ? 'Vérifié' : n.verification === 'pending' ? 'En attente' : 'Refusé'}</span>
                   </td>
+                  <td>
+                    <DocsSummary n={n} />
+                  </td>
                   <td>{n.busy ? 'En intervention' : n.available ? '🟢 En ligne' : 'Hors ligne'}</td>
                   <td>{n.ratingCount ? `★ ${n.rating.toFixed(1)} (${n.ratingCount})` : '—'}</td>
                   <td>{n.interventions}</td>
                   <td>{formatFCFA(n.earnings)}</td>
-                  <td>
+                  <td className="nowrap">
+                    <button className="btn btn-outline small" onClick={() => nav(`/admin/infirmiers/${n.id}`)}>
+                      Dossier
+                    </button>{' '}
                     {n.verification !== 'verified' && (
                       <AsyncButton
                         className="btn small"
@@ -1010,5 +1025,313 @@ function ServiceRow({ s, onSaved }: { s: Service; onSaved: () => void }) {
         )}
       </td>
     </tr>
+  );
+}
+
+// Dossier infirmier : pièces justificatives -------------------------------------------------------
+type AdminNurse = NurseProfile & { busy: boolean; interventions: number; earnings: number };
+
+function DocsSummary({ n }: { n: NurseProfile }) {
+  const st = DOC_LIST.map((d) => docOf(n, d.key).status);
+  const ok = st.filter((x) => x === 'validated').length;
+  const todo = st.filter((x) => x === 'submitted').length;
+  return (
+    <span className="small">
+      {ok}/{DOC_LIST.length} validés{todo > 0 && <span className="badge doc-submitted"> {todo} à vérifier</span>}
+    </span>
+  );
+}
+
+function NurseDetail() {
+  const { id } = useParams();
+  const tick = useTick();
+  const nav = useNavigate();
+  const { api, token } = useSession();
+  const { data, reload } = useResource<AdminNurse[]>('/admin/nurses', [tick]);
+  const n = data?.find((x) => x.id === id);
+  const [reject, setReject] = useState<DocKey | null>(null);
+  const [note, setNote] = useState('');
+  if (!data) return <Spinner />;
+  if (!n) return <p className="muted">Infirmier introuvable.</p>;
+  const review = async (key: DocKey, decision: 'validate' | 'reject', reviewNote = '') => {
+    await api(`/admin/nurses/${n.id}/documents/${key}/review`, { method: 'POST', json: { decision, note: reviewNote } });
+    await reload();
+  };
+  return (
+    <>
+      <PageHead title={n.name} sub={`${n.phone} · inscrit le ${fmtDate(n.createdAt)}`}>
+        <span className={`badge ver-${n.verification}`}>{n.verification === 'verified' ? 'Vérifié' : n.verification === 'pending' ? 'En attente' : 'Refusé'}</span>
+        <button className="btn btn-outline small" onClick={() => nav(`/admin/messages?to=${n.id}`)}>
+          ✉️ Envoyer un message
+        </button>
+        {n.verification !== 'verified' && (
+          <AsyncButton
+            className="btn small"
+            onClick={async () => {
+              await api(`/admin/nurses/${n.id}/verify`, { method: 'POST', json: { decision: 'verify' } });
+              reload();
+            }}
+          >
+            Valider le compte
+          </AsyncButton>
+        )}
+      </PageHead>
+      <div className="kpis three">
+        <Kpi label="Diplôme / Ordre" value={<span className="mono">{n.diplomaNumber || '—'} · {n.ordreNumber || '—'}</span>} />
+        <Kpi label="Interventions payées" value={n.interventions} />
+        <Kpi label="Note" value={n.ratingCount ? `★ ${n.rating.toFixed(1)} (${n.ratingCount})` : '—'} />
+      </div>
+      <section className="panel">
+        <h2>Pièces justificatives</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>Fichier</th>
+                <th>Statut</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {DOC_LIST.map((d) => {
+                const doc = docOf(n, d.key);
+                return (
+                  <tr key={d.key}>
+                    <td>
+                      <strong>{d.label}</strong>
+                      <br />
+                      <small className="muted">{d.hint}</small>
+                    </td>
+                    <td className="small">
+                      {doc.fileName ? (
+                        <>
+                          {doc.fileName}
+                          <br />
+                          <span className="muted">
+                            {doc.uploadedAt && fmtDate(doc.uploadedAt)} · {doc.size ? `${Math.ceil(doc.size / 1024)} Ko` : ''}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="muted">Aucun fichier</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`badge doc-${doc.status}`}>{DOC_STATUS_LABELS[doc.status]}</span>
+                      {doc.reviewNote && doc.status === 'rejected' && (
+                        <>
+                          <br />
+                          <small className="muted">{doc.reviewNote}</small>
+                        </>
+                      )}
+                    </td>
+                    <td className="nowrap">
+                      {doc.fileName && (
+                        <AsyncButton className="btn btn-outline small" onClick={() => openWithToken(`/admin/nurses/${n.id}/documents/${d.key}`, token!)}>
+                          Voir
+                        </AsyncButton>
+                      )}{' '}
+                      {doc.status === 'submitted' && (
+                        <>
+                          <AsyncButton className="btn small" onClick={() => review(d.key, 'validate')}>
+                            Valider
+                          </AsyncButton>{' '}
+                          <button className="btn btn-danger small" onClick={() => { setReject(d.key); setNote(''); }}>
+                            Refuser
+                          </button>
+                        </>
+                      )}
+                      {(doc.status === 'missing' || doc.status === 'validated') && (
+                        <AsyncButton
+                          className="btn btn-outline small"
+                          onClick={async () => {
+                            await api(`/admin/nurses/${n.id}/documents/${d.key}/request`, { method: 'POST', json: {} });
+                            reload();
+                          }}
+                        >
+                          {doc.status === 'missing' ? 'Relancer' : 'Redemander'}
+                        </AsyncButton>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {reject && (
+        <div className="sheet-backdrop" onClick={() => setReject(null)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Refuser : {DOC_LIST.find((d) => d.key === reject)?.label}</h3>
+            <label>
+              Motif (envoyé à l'infirmier par notification et SMS)
+              <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="ex. Document illisible, merci de renvoyer une photo nette." autoFocus />
+            </label>
+            <div className="btn-row">
+              <button className="btn btn-outline" onClick={() => setReject(null)}>
+                Annuler
+              </button>
+              <AsyncButton
+                className="btn btn-danger"
+                disabled={!note.trim()}
+                onClick={async () => {
+                  await review(reject, 'reject', note);
+                  setReject(null);
+                }}
+              >
+                Refuser le document
+              </AsyncButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// Messages aux infirmiers ---------------------------------------------------------------------------
+function Messages() {
+  const tick = useTick();
+  const { api } = useSession();
+  const nurses = useResource<AdminNurse[]>('/admin/nurses', [tick]);
+  const history = useResource<AdminBroadcast[]>('/admin/broadcasts');
+  const preset = new URLSearchParams(location.search).get('to');
+  const [target, setTarget] = useState<'all' | 'selected'>(preset ? 'selected' : 'all');
+  const [selected, setSelected] = useState<string[]>(preset ? [preset] : []);
+  const [filter, setFilter] = useState<'all' | 'online' | 'verified' | 'pending' | 'docs'>('all');
+  const [search, setSearch] = useState('');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [sms, setSms] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+
+  const list = (nurses.data ?? []).filter((n) => {
+    if (search && !`${n.name} ${n.phone}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filter === 'online') return n.available;
+    if (filter === 'verified') return n.verification === 'verified';
+    if (filter === 'pending') return n.verification === 'pending';
+    if (filter === 'docs') return DOC_LIST.some((d) => ['missing', 'rejected'].includes(docOf(n, d.key).status));
+    return true;
+  });
+  const allCount = (nurses.data ?? []).filter((n) => n.verification !== 'rejected').length;
+  const toggle = (nid: string) => setSelected((l) => (l.includes(nid) ? l.filter((x) => x !== nid) : [...l, nid]));
+  const templates: [string, string][] = [
+    ['Forte demande', 'Beaucoup de demandes en ce moment : activez votre disponibilité si vous le pouvez. Merci !'],
+    ['Documents', 'Merci de compléter vos documents dans Profil & documents afin de garder votre compte actif.'],
+    ['Formation', 'Une session de formation Kulawa aura lieu prochainement. Les détails suivront.'],
+  ];
+  const recipients = target === 'all' ? allCount : selected.length;
+
+  return (
+    <>
+      <PageHead title="Messages infirmiers" sub="Envoyez une information à un, plusieurs ou tous les infirmiers partenaires." />
+      <div className="panels">
+        <section className="panel">
+          <h2>Destinataires</h2>
+          <div className="seg">
+            <button className={target === 'all' ? 'on' : ''} onClick={() => setTarget('all')}>
+              Tous les infirmiers ({allCount})
+            </button>
+            <button className={target === 'selected' ? 'on' : ''} onClick={() => setTarget('selected')}>
+              Sélection ({selected.length})
+            </button>
+          </div>
+          {target === 'selected' && (
+            <>
+              <div className="row-between wrap">
+                <input placeholder="Rechercher un nom ou un numéro…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
+                  <option value="all">Tous</option>
+                  <option value="online">En ligne</option>
+                  <option value="verified">Vérifiés</option>
+                  <option value="pending">En attente de validation</option>
+                  <option value="docs">Documents manquants</option>
+                </select>
+              </div>
+              <div className="row-between">
+                <button className="link" onClick={() => setSelected((l) => [...new Set([...l, ...list.map((n) => n.id)])])}>
+                  Tout cocher ({list.length})
+                </button>
+                <button className="link" onClick={() => setSelected([])}>
+                  Tout décocher
+                </button>
+              </div>
+              <ul className="pick-list">
+                {list.map((n) => (
+                  <li key={n.id}>
+                    <label className="pick">
+                      <input type="checkbox" checked={selected.includes(n.id)} onChange={() => toggle(n.id)} />
+                      <Avatar name={n.name} size={30} />
+                      <span>
+                        {n.name}
+                        <small className="muted"> {n.phone}</small>
+                      </span>
+                      {n.available && <span className="badge ver-verified">En ligne</span>}
+                      {n.verification === 'pending' && <span className="badge ver-pending">En attente</span>}
+                    </label>
+                  </li>
+                ))}
+                {list.length === 0 && <li className="muted small">Aucun infirmier ne correspond.</li>}
+              </ul>
+            </>
+          )}
+        </section>
+        <section className="panel">
+          <h2>Message</h2>
+          <div className="chips">
+            {templates.map(([t, b]) => (
+              <button key={t} className="chip" onClick={() => { setTitle(t); setBody(b); }}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <label>
+            Titre
+            <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="ex. Réunion mensuelle" />
+          </label>
+          <label>
+            Message
+            <textarea rows={6} value={body} onChange={(e) => setBody(e.target.value)} maxLength={1000} />
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={sms} onChange={(e) => setSms(e.target.checked)} /> Envoyer aussi par SMS
+          </label>
+          {sent && <p className="success-banner">{sent}</p>}
+          <AsyncButton
+            className="btn"
+            disabled={!title.trim() || !body.trim() || recipients === 0}
+            onClick={async () => {
+              const b = await api<AdminBroadcast>('/admin/broadcasts', { method: 'POST', json: { target, nurseIds: selected, title, body, sms } });
+              setSent(`✓ Message envoyé à ${b.recipientIds.length} infirmier(s).`);
+              setTitle('');
+              setBody('');
+              history.reload();
+            }}
+          >
+            Envoyer à {recipients} infirmier(s)
+          </AsyncButton>
+        </section>
+      </div>
+      <section className="panel">
+        <h2>Messages envoyés</h2>
+        {!history.data?.length && <p className="muted">Aucun message envoyé.</p>}
+        <ul className="ratings">
+          {history.data?.map((b) => (
+            <li key={b.id}>
+              <span>📢</span>
+              <div>
+                <strong>{b.title}</strong>{' '}
+                <small className="muted">
+                  {fmtDate(b.createdAt)} · {b.target === 'all' ? `tous (${b.recipientIds.length})` : b.recipientNames.join(', ')}
+                  {b.sms ? ' · push + SMS' : ' · push'}
+                </small>
+                <p>{b.body}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }

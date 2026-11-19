@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import type {
+  AdminBroadcast,
   AppNotification,
+  DocKey,
   CareRequest,
   Incident,
   NurseProfile,
@@ -14,7 +16,8 @@ import type {
 export interface StoredUser extends User {
   passwordHash?: string;
 }
-export type StoredNurse = NurseProfile & { passwordHash?: string };
+/** docFiles : nom du fichier sur disque pour chaque pièce (jamais exposé au client). */
+export type StoredNurse = NurseProfile & { passwordHash?: string; docFiles?: Partial<Record<DocKey, string>> };
 
 export interface Database {
   users: (StoredUser | StoredNurse)[];
@@ -22,12 +25,14 @@ export interface Database {
   requests: CareRequest[];
   incidents: Incident[];
   notifications: AppNotification[];
+  broadcasts: AdminBroadcast[];
   settings: Settings;
   counters: { request: number };
 }
 
 const DATA_DIR = process.env.KULAWA_DATA_DIR ?? path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+export const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 
 export const id = () => crypto.randomUUID();
 export const now = () => new Date().toISOString();
@@ -60,8 +65,8 @@ function seed(): Database {
     ratingCount,
     documents:
       verification === 'verified'
-        ? { contract: 'validated', insurance: 'validated', diploma: 'validated' }
-        : { contract: 'submitted', insurance: 'missing', diploma: 'submitted' },
+        ? Object.fromEntries((['diploma', 'ordre', 'insurance', 'contract', 'identity'] as const).map((k) => [k, { status: 'validated', reviewedAt: t }]))
+        : {},
   });
 
   return {
@@ -86,14 +91,28 @@ function seed(): Database {
     requests: [],
     incidents: [],
     notifications: [],
+    broadcasts: [],
     settings: { commissionRate: 0.15, travelFee: 1000, searchRadiusKm: 15 },
     counters: { request: 0 },
   };
 }
 
+/** Met à niveau une base créée par une version précédente. */
+function migrate(d: Database): Database {
+  d.broadcasts ??= [];
+  for (const u of d.users) {
+    if (u.role !== 'nurse') continue;
+    const n = u as StoredNurse;
+    const docs = (n.documents ?? {}) as Record<string, unknown>;
+    for (const [k, v] of Object.entries(docs)) if (typeof v === 'string') docs[k] = { status: v };
+    n.documents = docs as StoredNurse['documents'];
+  }
+  return d;
+}
+
 function load(): Database {
   try {
-    if (fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) as Database;
+    if (fs.existsSync(DB_FILE)) return migrate(JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) as Database);
   } catch (e) {
     console.error('[db] lecture impossible, réinitialisation', e);
   }
@@ -118,6 +137,7 @@ export function save() {
 }
 
 export function reset() {
+  fs.rmSync(UPLOAD_DIR, { recursive: true, force: true });
   Object.assign(db, seed());
   persistNow(db);
 }
@@ -126,8 +146,8 @@ export const findUser = (uid?: unknown) => db.users.find((u) => u.id === uid);
 export const nurses = () => db.users.filter((u): u is StoredNurse => u.role === 'nurse');
 export const findNurse = (uid?: unknown) => nurses().find((n) => n.id === uid);
 
-export function publicUser<T extends { passwordHash?: string }>(u: T): Omit<T, 'passwordHash'> {
-  const { passwordHash: _ignored, ...rest } = u;
+export function publicUser<T extends { passwordHash?: string; docFiles?: unknown }>(u: T): Omit<T, 'passwordHash' | 'docFiles'> {
+  const { passwordHash: _ignored, docFiles: _files, ...rest } = u;
   return rest;
 }
 

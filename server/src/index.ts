@@ -9,7 +9,8 @@ import { initRealtime } from './realtime.js';
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+// 8 Mo : les pièces justificatives sont envoyées encodées en base64.
+app.use(express.json({ limit: '8mb' }));
 app.use('/api', api);
 
 // En production, le serveur sert aussi l'application web compilée.
