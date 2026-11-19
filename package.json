@@ -9,6 +9,6 @@
     "dev:mobile": "npm --prefix mobile start",
     "build": "npm --prefix web run build",
     "start": "npm --prefix server start",
-    "typecheck": "npm --prefix server run typecheck && npx --prefix web tsc -p web --noEmit && npx --prefix mobile tsc -p mobile --noEmit"
+    "typecheck": "cd server && npx tsc && cd ../web && npx tsc --noEmit && cd ../mobile && npx tsc --noEmit && echo OK"
   }
 }
