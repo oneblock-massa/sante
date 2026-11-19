@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Kulawa",
+    "slug": "kulawa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ne.kulawa.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Kulawa utilise votre position pour envoyer l'infirmier à la bonne adresse et partager votre trajet."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0b4a9c",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "ne.kulawa.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Kulawa utilise votre position pour envoyer l'infirmier à la bonne adresse et partager votre trajet."
+        }
+      ]
+    ]
+  }
+}
