@@ -1,0 +1,10 @@
+{
+  "name": "Kulawa — Soins infirmiers à domicile",
+  "short_name": "Kulawa",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0b2a4a",
+  "lang": "fr",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
