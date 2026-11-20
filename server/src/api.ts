@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import type { AdminBroadcast, CareRequest, DocKey, Incident, PaymentMethod, RequestStatus, Service } from '../../shared/types.js';
-import { ACTIVE_STATUSES, DOC_LIST, PAYMENT_LABELS, formatFCFA } from '../../shared/types.js';
+import { ACTIVE_STATUSES, APP_VERSION, DOC_LIST, PAYMENT_LABELS, formatFCFA } from '../../shared/types.js';
 import {
   db,
   distanceKm,
@@ -85,7 +85,7 @@ function assignNurse(r: CareRequest, nurse: StoredNurse, byAdmin = false) {
 }
 
 // --- Démo ------------------------------------------------------------------
-api.get('/health', (_req, res) => res.json({ ok: true, name: 'Kulawa API', time: now() }));
+api.get('/health', (_req, res) => res.json({ ok: true, name: 'Kulawa API', version: APP_VERSION, time: now() }));
 
 api.post('/demo/reset', (_req, res) => {
   if (process.env.NODE_ENV === 'production' && process.env.KULAWA_ALLOW_RESET !== '1') return bad(res, 'Désactivé', 403);

@@ -1,5 +1,8 @@
 // Types et constantes partagés entre le serveur, l'application web et l'application mobile.
 
+/** Version affichée dans les applications : permet de vérifier qu'on utilise la dernière mise à jour. */
+export const APP_VERSION = '1.2 — documents & messages';
+
 export type Role = 'patient' | 'nurse' | 'admin';
 
 export interface User {

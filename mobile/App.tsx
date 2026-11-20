@@ -7,6 +7,7 @@ import { AccentContext, Button, Loading } from './src/ui';
 import { colors, nurseAccent, patientAccent, s } from './src/theme';
 import PatientApp from './src/patient/PatientApp';
 import NurseApp from './src/nurse/NurseApp';
+import { APP_VERSION } from '../shared/types';
 
 export default function App() {
   return (
@@ -93,6 +94,7 @@ function Welcome({ onPick }: { onPick: (r: 'patient' | 'nurse') => void }) {
         />
         {status && <Text style={{ color: status.startsWith('✓') ? '#8fd36f' : '#ffb4ae' }}>{status}</Text>}
       </View>
+      <Text style={{ color: '#8ea6c0', fontSize: 12 }}>Version {APP_VERSION}</Text>
     </ScrollView>
   );
 }

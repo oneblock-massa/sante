@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
 import { Spinner } from './components/ui';
+import { APP_VERSION } from '../../shared/types';
 
 const PatientApp = lazy(() => import('./patient/PatientApp'));
 const NurseApp = lazy(() => import('./nurse/NurseApp'));
@@ -47,6 +48,7 @@ function Landing() {
       <p className="tip">
         Astuce démo : ouvrez les trois modules dans trois onglets pour voir les notifications circuler en temps réel.
       </p>
+      <p className="tip">Version {APP_VERSION}</p>
     </div>
   );
 }

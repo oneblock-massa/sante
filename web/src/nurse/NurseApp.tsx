@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { CareRequest, NurseProfile } from '../../../shared/types';
-import { ACTIVE_STATUSES, formatFCFA } from '../../../shared/types';
+import { ACTIVE_STATUSES, APP_VERSION, formatFCFA } from '../../../shared/types';
 import { SessionProvider, apiFetch, useResource, useSession, useSocketEvent } from '../lib/session';
 import { AsyncButton, Avatar, ErrorText, NotificationList, Spinner, Stars, StatusBadge, Toasts } from '../components/ui';
 import { MapView, type MapMarker } from '../components/MapView';
@@ -709,6 +709,7 @@ function ProfileDocs() {
           <button className="link danger" onClick={logout}>
             Se déconnecter
           </button>
+          <p className="muted small center">Kulawa Pro · version {APP_VERSION}</p>
         </div>
       )}
     </main>

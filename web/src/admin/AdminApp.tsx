@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import type { AdminBroadcast, AppNotification, CareRequest, DocKey, Incident, NurseProfile, PaymentMethod, Service, Settings, User } from '../../../shared/types';
-import { DOC_LIST, DOC_STATUS_LABELS, PAYMENT_LABELS, STATUS_LABELS, docOf, formatFCFA } from '../../../shared/types';
+import { APP_VERSION, DOC_LIST, DOC_STATUS_LABELS, PAYMENT_LABELS, STATUS_LABELS, docOf, formatFCFA } from '../../../shared/types';
 import { SessionProvider, apiFetch, useResource, useSession, useSocketEvent } from '../lib/session';
 import { AsyncButton, Avatar, ErrorText, Spinner, Stars, StatusBadge, Toasts } from '../components/ui';
 import { MapView, type MapMarker } from '../components/MapView';
@@ -114,7 +114,11 @@ function AdminLayout() {
             ))}
           </nav>
           <div className="sidebar-foot">
-            <small>{user?.name}</small>
+            <small>
+              {user?.name}
+              <br />
+              <span style={{ opacity: 0.6 }}>v{APP_VERSION}</span>
+            </small>
             <button className="link" onClick={logout}>
               Déconnexion
             </button>

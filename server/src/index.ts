@@ -6,6 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import { api } from './api.js';
 import { initRealtime } from './realtime.js';
+import { APP_VERSION } from '../../shared/types.js';
 
 const app = express();
 app.use(cors());
@@ -31,6 +32,6 @@ initRealtime(server);
 
 const port = Number(process.env.PORT ?? 4000);
 server.listen(port, '0.0.0.0', () => {
-  console.log(`Kulawa API prête sur http://localhost:${port}`);
+  console.log(`Kulawa API prête sur http://localhost:${port} — version ${APP_VERSION}`);
   if (!fs.existsSync(path.join(webDist, 'index.html'))) console.warn('⚠ Application web non compilée : lancez « npm run build » puis relancez « npm start ».');
 });
