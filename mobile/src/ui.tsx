@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RequestStatus } from '../../shared/types';
 import { STATUS_LABELS } from '../../shared/types';
@@ -141,6 +141,24 @@ const STATUS_COLORS: Record<RequestStatus, [string, string]> = {
   rated: ['#eaf6e4', '#3b7f22'],
   cancelled: ['#fbe9e8', colors.red],
 };
+
+// Logo officiel Kulawa : symbole + nom (couleur de marque #1F3A5F). `badge` le pose sur un fond blanc (écrans sombres).
+export function Logo({ size = 44, tag, badge }: { size?: number; tag?: string; badge?: boolean }) {
+  return (
+    <View style={{ alignItems: 'center', gap: 4, alignSelf: badge ? 'flex-start' : 'center' }}>
+      <View
+        style={[
+          { flexDirection: 'row', alignItems: 'center', gap: size * 0.22 },
+          badge ? { backgroundColor: '#fff', borderRadius: 18, paddingVertical: 10, paddingHorizontal: 16 } : null,
+        ]}
+      >
+        <Image source={require('../assets/logo-symbol.png')} style={{ width: size, height: size }} accessibilityIgnoresInvertColors />
+        <Text style={{ fontSize: size * 0.82, fontWeight: '800', color: '#1F3A5F', letterSpacing: -0.5 }}>Kulawa</Text>
+      </View>
+      {tag ? <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 2, color: colors.muted }}>{tag.toUpperCase()}</Text> : null}
+    </View>
+  );
+}
 
 export function Badge({ label, bg = colors.block, fg = colors.muted }: { label: string; bg?: string; fg?: string }) {
   return (

@@ -6,7 +6,7 @@ import { ACTIVE_STATUSES, formatFCFA } from '../../../shared/types';
 import { colors, s } from '../theme';
 import { NavProvider, useNav } from '../nav';
 import { rawApi, useResource, useSession, useSocketEvent } from '../session';
-import { Avatar, Badge, Button, Card, Field, Loading, NotificationList, Pulse, Row, Screen, Segmented, Stars, StatusBadge, Tabs, ToastBanner, useAccent } from '../ui';
+import { Avatar, Badge, Button, Card, Field, Loading, Logo, NotificationList, Pulse, Row, Screen, Segmented, Stars, StatusBadge, Tabs, ToastBanner, useAccent } from '../ui';
 import { ChatSheet, IncidentSheet, call, fmtDate, getPosition, openMaps } from '../common';
 import { NurseDocuments, missingDocs } from './Documents';
 
@@ -68,7 +68,7 @@ function NurseLogin() {
     <Screen title={mode === 'login' ? 'Connexion' : 'Candidature'} back={false} center>
       <View style={{ width: '100%', gap: 14 }}>
         <View style={[s.center, { gap: 6 }]}>
-          <Text style={{ fontSize: 30, fontWeight: '900', color: colors.navy }}>Kulawa Pro</Text>
+          <Logo size={44} tag="Pro" />
           <Text style={s.muted}>L'application des infirmiers partenaires.</Text>
         </View>
         {mode === 'register' && <Field label="Nom complet" value={f.name} onChangeText={set('name')} />}

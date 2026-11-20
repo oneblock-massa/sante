@@ -46,8 +46,10 @@ function AdminLogin() {
         }}
       >
         <div className="login-hero">
-          <img src="/icon.svg" alt="" width={56} height={56} />
-          <h1>Kulawa Back-office</h1>
+          <h1>
+            <img src="/logo.svg" alt="Kulawa" className="logo-full" />
+            <span className="logo-tag">Back-office</span>
+          </h1>
           <p>Coordination infirmière</p>
         </div>
         <label>
@@ -97,7 +99,7 @@ function AdminLayout() {
         <Toasts />
         <aside className={`sidebar ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
           <div className="sidebar-brand">
-            <img src="/icon.svg" alt="" width={32} height={32} />
+            <img src="/icon.svg" alt="" width={36} height={36} className="logo-chip" />
             <div>
               <strong>Kulawa</strong>
               <small>Back-office</small>

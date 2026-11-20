@@ -117,8 +117,9 @@ function PatientLogin() {
     <div className="app-shell patient">
       <div className="login">
         <div className="login-hero">
-          <img src="/icon.svg" alt="" width={64} height={64} />
-          <h1>Kulawa</h1>
+          <h1>
+            <img src="/logo.svg" alt="Kulawa" className="logo-full" />
+          </h1>
           <p>Un infirmier diplômé chez vous, en quelques minutes.</p>
         </div>
         {step === 'phone' ? (

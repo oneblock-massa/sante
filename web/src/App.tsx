@@ -25,7 +25,9 @@ function Landing() {
     <div className="landing">
       <header>
         <p className="eyebrow">Soins infirmiers à domicile · Niamey</p>
-        <h1>Kulawa</h1>
+        <h1 className="logo-badge">
+          <img src="/logo.svg" alt="Kulawa" />
+        </h1>
         <p className="lead">Un infirmier diplômé chez vous en quelques minutes. Demandez, suivez, payez par mobile money.</p>
       </header>
       <div className="modules">

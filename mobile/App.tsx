@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { SessionProvider, rawApi, useSession } from './src/session';
-import { AccentContext, Button, Loading } from './src/ui';
+import { AccentContext, Button, Loading, Logo } from './src/ui';
 import { colors, nurseAccent, patientAccent, s } from './src/theme';
 import PatientApp from './src/patient/PatientApp';
 import NurseApp from './src/nurse/NurseApp';
@@ -65,7 +65,7 @@ function Welcome({ onPick }: { onPick: (r: 'patient' | 'nurse') => void }) {
   return (
     <ScrollView style={{ backgroundColor: colors.navy }} contentContainerStyle={{ padding: 24, gap: 18, flexGrow: 1, justifyContent: 'center' }}>
       <Text style={{ color: '#9fb7d1', letterSpacing: 3, fontSize: 12 }}>SOINS INFIRMIERS À DOMICILE · NIAMEY</Text>
-      <Text style={{ color: '#fff', fontSize: 56, fontWeight: '900' }}>Kulawa</Text>
+      <Logo size={52} badge />
       <Text style={{ color: '#c9d7e6', fontSize: 17 }}>Un infirmier diplômé chez vous en quelques minutes.</Text>
       <Pressable onPress={() => onPick('patient')} style={{ borderWidth: 1.5, borderColor: '#2f6fcc', borderRadius: 16, padding: 18, gap: 4, backgroundColor: 'rgba(255,255,255,.05)' }}>
         <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>● Je suis patient</Text>

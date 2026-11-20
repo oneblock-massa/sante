@@ -5,7 +5,7 @@ import { ACTIVE_STATUSES, PAYMENT_LABELS, STATUS_LABELS, formatFCFA } from '../.
 import { colors, s } from '../theme';
 import { NavProvider, useNav } from '../nav';
 import { rawApi, useResource, useSession, useSocketEvent } from '../session';
-import { Avatar, Badge, Button, Card, Field, Loading, NotificationList, Pulse, Row, Screen, Segmented, Stars, StatusBadge, Tabs, ToastBanner, useAccent } from '../ui';
+import { Avatar, Badge, Button, Card, Field, Loading, Logo, NotificationList, Pulse, Row, Screen, Segmented, Stars, StatusBadge, Tabs, ToastBanner, useAccent } from '../ui';
 import { ChatSheet, IncidentSheet, ReportView, call, fmtDate, fmtTime, getPosition } from '../common';
 
 export default function PatientApp() {
@@ -66,7 +66,7 @@ function PatientLogin() {
     <Screen title="Connexion" back={false} center>
       <View style={{ width: '100%', gap: 16 }}>
         <View style={[s.center, { gap: 6, marginBottom: 8 }]}>
-          <Text style={{ fontSize: 34, fontWeight: '900', color: colors.navy }}>Kulawa</Text>
+          <Logo size={48} />
           <Text style={s.muted}>Un infirmier diplômé chez vous, en quelques minutes.</Text>
         </View>
         {step === 'phone' ? (

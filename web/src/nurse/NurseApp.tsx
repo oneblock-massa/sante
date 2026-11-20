@@ -111,8 +111,10 @@ function NurseLogin() {
     <div className="app-shell nurse">
       <div className="login">
         <div className="login-hero">
-          <img src="/icon.svg" alt="" width={64} height={64} />
-          <h1>Kulawa Pro</h1>
+          <h1>
+            <img src="/logo.svg" alt="Kulawa" className="logo-full" />
+            <span className="logo-tag">Pro</span>
+          </h1>
           <p>L'application des infirmiers partenaires.</p>
         </div>
         <form className="card stack" onSubmit={submit}>

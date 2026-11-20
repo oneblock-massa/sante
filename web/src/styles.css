@@ -140,6 +140,11 @@ a { color: var(--accent); }
 .login-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .login-hero h1 { font-size: 30px; }
 .login-hero p { margin: 0; color: var(--muted); }
+/* Logo officiel Kulawa */
+.logo-full { display: block; height: 56px; width: auto; max-width: 100%; }
+.login-hero h1 { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.logo-tag { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.logo-chip { background: #fff; border-radius: 10px; padding: 3px; flex-shrink: 0; }
 .phone-input { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .phone-input span { background: var(--block); padding: 11px 12px; color: var(--muted); font-weight: 600; }
 .phone-input input { border: none; border-radius: 0; }
@@ -349,6 +354,8 @@ tr.clickable:hover td { background: #f7faf5; }
 body:has(.landing) { background: #0b2a4a; }
 .landing .eyebrow { font-family: ui-monospace, monospace; letter-spacing: .2em; text-transform: uppercase; font-size: 13px; color: #9fb7d1; margin: 0 0 12px; }
 .landing h1 { color: #fff; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(56px, 10vw, 96px); line-height: 1; }
+.landing .logo-badge { display: inline-flex; background: #fff; border-radius: 20px; padding: 14px 22px; }
+.landing .logo-badge img { display: block; height: clamp(52px, 9vw, 84px); width: auto; max-width: 100%; }
 .landing .lead { font-size: 20px; color: #c9d7e6; max-width: 620px; }
 .modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .module { background: rgba(255, 255, 255, .05); border: 1.5px solid; border-radius: 18px; padding: 22px; color: #fff; text-decoration: none; display: flex; flex-direction: column; gap: 8px; transition: transform .15s, background .15s; }
