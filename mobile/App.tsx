@@ -21,7 +21,7 @@ export default function App() {
   );
 }
 
-// Écran d'ouverture : le symbole Kulawa tourne ~1,6 s, puis fondu vers la plateforme.
+// Écran d'ouverture : le symbole Kulawa tourne 5 s, puis fondu vers la plateforme.
 function Splash({ onDone }: { onDone: () => void }) {
   const spin = useRef(new Animated.Value(0)).current;
   const word = useRef(new Animated.Value(0)).current;
@@ -35,7 +35,7 @@ function Splash({ onDone }: { onDone: () => void }) {
         loop.stop();
         onDone();
       });
-    }, 1600);
+    }, 5000);
     return () => clearTimeout(t);
   }, [spin, word, fade, onDone]);
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
