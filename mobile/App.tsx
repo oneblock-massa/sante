@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { SessionProvider, rawApi, useSession } from './src/session';
@@ -10,12 +10,42 @@ import NurseApp from './src/nurse/NurseApp';
 import { APP_VERSION } from '../shared/types';
 
 export default function App() {
+  const [splash, setSplash] = useState(true);
   return (
     <SafeAreaProvider>
       <SessionProvider>
         <Root />
       </SessionProvider>
+      {splash && <Splash onDone={() => setSplash(false)} />}
     </SafeAreaProvider>
+  );
+}
+
+// Écran d'ouverture : le symbole Kulawa tourne ~1,6 s, puis fondu vers la plateforme.
+function Splash({ onDone }: { onDone: () => void }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  const word = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1200, easing: Easing.bezier(0.6, 0, 0.4, 1), useNativeDriver: true }));
+    loop.start();
+    Animated.timing(word, { toValue: 1, duration: 600, delay: 250, useNativeDriver: true }).start();
+    const t = setTimeout(() => {
+      Animated.timing(fade, { toValue: 0, duration: 450, useNativeDriver: true }).start(() => {
+        loop.stop();
+        onDone();
+      });
+    }, 1600);
+    return () => clearTimeout(t);
+  }, [spin, word, fade, onDone]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', gap: 22, opacity: fade }]}>
+      <Animated.View style={{ transform: [{ rotate }] }}>
+        <Image source={require('./assets/logo-symbol.png')} style={{ width: 112, height: 112 }} />
+      </Animated.View>
+      <Animated.Text style={{ fontSize: 40, fontWeight: '800', color: '#1F3A5F', letterSpacing: -0.5, opacity: word }}>Kulawa</Animated.Text>
+    </Animated.View>
   );
 }
 
