@@ -162,8 +162,7 @@ function NurseLogin() {
 // 02 — Disponibilité + 03 — Notification reçue ------------------------------------------
 function Availability() {
   const nav = useNavigate();
-  const { user, setUser, api, notifications } = useSession<NurseProfile>();
-  const coordination = notifications.filter((n) => n.event === 'admin_message').slice(0, 2);
+  const { user, setUser, api } = useSession<NurseProfile>();
   const offers = useResource<Offer[]>('/nurse/offers', [user?.available]);
   const mine = useResource<CareRequest[]>('/requests/mine');
   const earnings = useResource<Earnings>('/nurse/earnings');
@@ -206,13 +205,6 @@ function Availability() {
           📄 {missingDocs(user).length} document(s) à fournir : {missingDocs(user).map((d) => d.label).join(', ')} →
         </button>
       )}
-      {coordination.map((m) => (
-        <div key={m.id} className={`card coord ${m.read ? '' : 'unread'}`}>
-          <small>Message de la coordination · {fmtDate(m.createdAt)}</small>
-          <strong>{m.title.replace(/^📢\s*/, '')}</strong>
-          <p>{m.body}</p>
-        </div>
-      ))}
       <div className={`card availability ${user.available ? 'on' : ''}`}>
         <div>
           <strong>{user.available ? 'Vous êtes disponible' : 'Vous êtes hors ligne'}</strong>

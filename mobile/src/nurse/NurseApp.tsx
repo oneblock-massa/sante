@@ -98,9 +98,8 @@ function NurseLogin() {
 function Availability() {
   const nav = useNav();
   const a = useAccent();
-  const { user: u, setUser, api, notifications } = useSession();
+  const { user: u, setUser, api } = useSession();
   const user = u as NurseProfile | null;
-  const coordination = notifications.filter((n) => n.event === 'admin_message').slice(0, 2);
   const offers = useResource<Offer[]>('/nurse/offers', [user?.available]);
   const mine = useResource<CareRequest[]>('/requests/mine');
   const earnings = useResource<Earnings>('/nurse/earnings');
@@ -135,13 +134,6 @@ function Availability() {
       {missingDocs(user).length > 0 && (
         <Text style={s.warn}>📄 {missingDocs(user).length} document(s) à fournir — onglet Profil : {missingDocs(user).map((d) => d.label).join(', ')}</Text>
       )}
-      {coordination.map((m) => (
-        <Card key={m.id} style={{ borderLeftWidth: 4, borderLeftColor: colors.navy, backgroundColor: m.read ? '#fff' : '#eef3fa' }}>
-          <Text style={s.small}>Message de la coordination · {fmtDate(m.createdAt)}</Text>
-          <Text style={s.h3}>{m.title.replace(/^📢\s*/, '')}</Text>
-          <Text style={s.text}>{m.body}</Text>
-        </Card>
-      ))}
       <Card style={[s.between, user.available ? { backgroundColor: a.soft, borderColor: a.main } : {}]}>
         <View style={{ flex: 1 }}>
           <Text style={s.h3}>{user.available ? 'Vous êtes disponible' : 'Vous êtes hors ligne'}</Text>
